@@ -1,0 +1,37 @@
+[project]
+name = "wsi-poc-viewer"
+version = "0.1.0"
+description = "Proof-of-concept WSI viewer with OpenSeadragon + scalebar"
+requires-python = ">=3.13,<4.0"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "numpy",
+  "scipy",
+  "opencv-python-headless",
+  "Pillow",
+  "openslide-python",
+  "openslide-bin",
+  "jinja2",
+  "python-multipart",
+  "pydantic_settings",
+  "pyyaml",
+  "redis"
+]
+
+[project.scripts]
+wsi-local-viewer = "app.local_launcher:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+app = ["templates/*.html", "templates/**/*.html", "static/**/*"]
+
+[dependency-groups]
+dev = ["pytest", "mypy", "ruff", "pyinstaller"]

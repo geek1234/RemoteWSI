@@ -1,0 +1,897 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Local WSI Viewer</title>
+  <link rel="icon" type="image/png" href="/logo" />
+  <script src="https://cdn.jsdelivr.net/npm/openseadragon@5.0.1/build/openseadragon/openseadragon.min.js"></script>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --line: #dde3ed;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #2563eb;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; font-family: "Segoe UI", Arial, sans-serif; color: var(--text); background: var(--bg); }
+    .shell { height: 100%; display: grid; grid-template-rows: 58px 1fr; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+      padding: 0 14px;
+    }
+    .brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .brand-logo { width: 22px; height: 22px; object-fit: contain; flex: 0 0 auto; }
+    .title { font-weight: 700; color: var(--accent); }
+    .root { color: var(--muted); font-size: 12px; margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .actions { margin-left: auto; display: flex; gap: 8px; }
+    .btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 6px;
+      padding: 7px 12px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .layout { min-height: 0; display: grid; grid-template-columns: 360px 1fr; }
+    .left {
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      min-height: 0;
+    }
+    .search { padding: 10px; }
+    .search input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 9px 10px;
+      font-size: 13px;
+      outline: none;
+    }
+    .search input:focus { border-color: var(--accent); }
+    .status { padding: 0 10px 10px; color: var(--muted); font-size: 12px; }
+    .slide-list { overflow: auto; padding: 0 10px 10px; }
+    .slide-item {
+      display: grid;
+      grid-template-columns: 84px 1fr;
+      gap: 10px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      background: #fff;
+    }
+    .slide-item.active { border-color: var(--accent); background: #edf3ff; }
+    .thumb-wrap {
+      width: 84px;
+      height: 62px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      display: grid;
+      place-items: center;
+    }
+    .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; }
+    .slide-name { font-size: 13px; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .slide-path { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.3; max-height: 2.6em; overflow: hidden; }
+    .slide-meta { margin-top: 6px; color: #334155; font-size: 11px; }
+    .pager { padding: 10px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .right {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: 1fr auto auto;
+      background: #fff;
+    }
+    #viewerHost { position: relative; min-height: 0; background: #0f172a; }
+    #viewer { position: absolute; inset: 0; }
+    .meta-panel {
+      border-top: 1px solid var(--line);
+      background: #fff;
+      padding: 10px 12px;
+      color: #0f172a;
+      font-size: 13px;
+      display: grid;
+      gap: 8px;
+      overflow: auto;
+    }
+    .meta-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: space-between;
+      min-height: 28px;
+    }
+    .meta-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .meta-size-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #334155;
+      font-size: 11px;
+    }
+    .meta-size-range {
+      width: 120px;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 8px 16px;
+    }
+    .meta-panel.collapsed .meta-grid {
+      display: none;
+    }
+    .view-mode {
+      color: #334155;
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .norm-panel {
+      border-top: 1px solid var(--line);
+      background: #fff;
+      padding: 10px 12px;
+      display: grid;
+      gap: 10px;
+      overflow: auto;
+    }
+    .norm-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 28px;
+    }
+    .norm-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .norm-body {
+      display: grid;
+      gap: 10px;
+    }
+    .norm-panel.collapsed .norm-body {
+      display: none;
+    }
+    .norm-controls {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(110px, 1fr));
+      gap: 8px 10px;
+      align-items: end;
+    }
+    .norm-field {
+      display: grid;
+      gap: 4px;
+      font-size: 12px;
+      color: #334155;
+    }
+    .norm-field-check {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #334155;
+      padding-bottom: 2px;
+    }
+    .norm-input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 12px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
+    .norm-input:focus { border-color: var(--accent); }
+    .norm-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 8px;
+      align-items: end;
+    }
+    .norm-status {
+      color: var(--muted);
+      font-size: 12px;
+      min-height: 16px;
+    }
+    .norm-results {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 8px;
+    }
+    .norm-card {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .norm-card.switchable {
+      cursor: pointer;
+    }
+    .norm-card.switchable:hover {
+      border-color: var(--accent);
+    }
+    .norm-card.switchable.active {
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.25);
+    }
+    .norm-card-title {
+      padding: 6px 8px;
+      font-size: 11px;
+      color: #334155;
+      border-bottom: 1px solid var(--line);
+      background: #f8fafc;
+    }
+    .norm-img-wrap {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background: #eef2f7;
+      display: grid;
+      place-items: center;
+    }
+    .norm-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .muted { color: var(--muted); }
+    @media (max-width: 1080px) {
+      .layout { grid-template-columns: 1fr; grid-template-rows: 320px 1fr; }
+      .left { border-right: 0; border-bottom: 1px solid var(--line); }
+      .meta-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .norm-controls { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .norm-row { grid-template-columns: 1fr; }
+      .norm-results { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .meta-header { align-items: flex-start; flex-direction: column; }
+      .meta-actions { justify-content: flex-start; }
+      .norm-header { align-items: flex-start; flex-direction: column; }
+      .norm-actions { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="topbar">
+      <div class="brand">
+        <img class="brand-logo" src="/logo" alt="Logo" />
+        <div class="title">Local WSI Viewer</div>
+      </div>
+      <div class="root">Root: {{ root }}</div>
+      <div class="root">Package: {{ package_root }}</div>
+      <div class="actions">
+        <input id="packageInput" type="file" accept=".tawpkg,.zip" style="display:none" />
+        <button id="importPackageBtn" class="btn">Import Package</button>
+        <button id="refreshBtn" class="btn">Reindex</button>
+      </div>
+    </div>
+    <div class="layout">
+      <div class="left">
+        <div class="search"><input id="searchInput" placeholder="Search slides by name/path" /></div>
+        <div id="statusText" class="status">Ready</div>
+        <div id="slideList" class="slide-list"></div>
+        <div class="pager">
+          <button id="prevBtn" class="btn">Prev</button>
+          <span id="pageInfo">0 / 0</span>
+          <button id="nextBtn" class="btn">Next</button>
+        </div>
+      </div>
+      <div id="rightPanel" class="right">
+        <div id="viewerHost"><div id="viewer"></div></div>
+        <div id="metaPanel" class="meta-panel">
+          <div class="meta-header">
+            <div id="mainViewLabel" class="view-mode">Main View: Slide</div>
+            <div class="meta-actions">
+              <button id="showSlideBtn" class="btn">Show Slide</button>
+              <button id="toggleInfoBtn" class="btn">Collapse Info</button>
+              <label class="meta-size-label" for="infoSizeRange">
+                Info Size
+                <input id="infoSizeRange" class="meta-size-range" type="range" min="64" max="260" step="4" value="110" />
+              </label>
+            </div>
+          </div>
+          <div id="metaGrid" class="meta-grid">
+            <div><div class="muted">Name</div><div id="mName">-</div></div>
+            <div><div class="muted">Size</div><div id="mSize">-</div></div>
+            <div><div class="muted">Dimensions</div><div id="mDim">-</div></div>
+            <div><div class="muted">Levels</div><div id="mLevels">-</div></div>
+            <div><div class="muted">Vendor</div><div id="mVendor">-</div></div>
+            <div><div class="muted">Objective</div><div id="mObj">-</div></div>
+            <div><div class="muted">MPP X</div><div id="mMppX">-</div></div>
+            <div><div class="muted">MPP Y</div><div id="mMppY">-</div></div>
+          </div>
+        </div>
+        <div id="normPanel" class="norm-panel">
+          <div class="norm-header">
+            <div class="view-mode">Online GDDN(A,B)</div>
+            <div class="norm-actions">
+              <button id="toggleNormPanelBtn" class="btn">Collapse GDDN</button>
+              <label class="meta-size-label" for="normSizeRange">
+                GDDN Size
+                <input id="normSizeRange" class="meta-size-range" type="range" min="130" max="560" step="10" value="320" />
+              </label>
+            </div>
+          </div>
+          <div id="normBody" class="norm-body">
+            <div class="norm-row">
+            <div class="norm-field">
+              <label for="normSourceSelect">Source A</label>
+              <select id="normSourceSelect" class="norm-input"></select>
+            </div>
+            <div class="norm-field">
+              <label for="normTargetSelect">Target B</label>
+              <select id="normTargetSelect" class="norm-input"></select>
+            </div>
+            <button id="runNormBtn" class="btn">Run GDDN(A,B)</button>
+            </div>
+
+            <div class="norm-controls">
+            <div class="norm-field">
+              <label for="normTau">Tau</label>
+              <input id="normTau" class="norm-input" type="number" min="0.01" max="5" step="0.01" value="0.2" />
+            </div>
+            <div class="norm-field">
+              <label for="normLam">Lambda</label>
+              <input id="normLam" class="norm-input" type="number" min="0.1" max="50" step="0.1" value="5" />
+            </div>
+            <div class="norm-field">
+              <label for="normRows">Tile Rows</label>
+              <input id="normRows" class="norm-input" type="number" min="1" max="128" step="1" value="4" />
+            </div>
+            <div class="norm-field">
+              <label for="normCols">Tile Cols</label>
+              <input id="normCols" class="norm-input" type="number" min="1" max="128" step="1" value="4" />
+            </div>
+            <div class="norm-field">
+              <label for="normMaxSide">Max Side</label>
+              <input id="normMaxSide" class="norm-input" type="number" min="256" max="16384" step="64" value="2048" />
+            </div>
+            <label class="norm-field-check">
+              <input id="normPreferLow" type="checkbox" checked />
+              Prefer low magnification
+            </label>
+            </div>
+
+            <div id="normStatus" class="norm-status">Color normalization ready.</div>
+
+            <div class="norm-results">
+            <div class="norm-card switchable" data-artifact-key="sourcePreview">
+              <div class="norm-card-title">Source Preview</div>
+              <div class="norm-img-wrap"><img id="normSourcePreview" alt="source preview" /></div>
+            </div>
+            <div class="norm-card switchable" data-artifact-key="targetPreview">
+              <div class="norm-card-title">Target Preview</div>
+              <div class="norm-img-wrap"><img id="normTargetPreview" alt="target preview" /></div>
+            </div>
+            <div class="norm-card switchable" data-artifact-key="normalizedTiled">
+              <div class="norm-card-title">Normalized (Tiled)</div>
+              <div class="norm-img-wrap"><img id="normTiledPreview" alt="normalized tiled" /></div>
+            </div>
+            <div class="norm-card switchable" data-artifact-key="normalizedMono">
+              <div class="norm-card-title">Normalized (Mono)</div>
+              <div class="norm-img-wrap"><img id="normMonoPreview" alt="normalized mono" /></div>
+            </div>
+            <div class="norm-card switchable" data-artifact-key="differenceHeatmap">
+              <div class="norm-card-title">Difference Heatmap</div>
+              <div class="norm-img-wrap"><img id="normDiffPreview" alt="difference heatmap" /></div>
+            </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const artifactTitleMap = {
+      sourcePreview: "Source Preview",
+      targetPreview: "Target Preview",
+      normalizedTiled: "Normalized (Tiled)",
+      normalizedMono: "Normalized (Mono)",
+      differenceHeatmap: "Difference Heatmap"
+    };
+
+    const state = {
+      pageSize: 80,
+      offset: 0,
+      total: 0,
+      q: "",
+      slides: [],
+      currentId: null,
+      viewer: null,
+      normRunning: false,
+      lastOpenedSlide: null,
+      normArtifacts: {},
+      currentArtifactKey: "",
+      infoCollapsed: false,
+      normCollapsed: false,
+      infoPanelHeight: 110,
+      normPanelHeight: 320
+    };
+
+    const el = {
+      rightPanel: document.getElementById("rightPanel"),
+      list: document.getElementById("slideList"),
+      status: document.getElementById("statusText"),
+      search: document.getElementById("searchInput"),
+      prev: document.getElementById("prevBtn"),
+      next: document.getElementById("nextBtn"),
+      pageInfo: document.getElementById("pageInfo"),
+      refresh: document.getElementById("refreshBtn"),
+      importPackage: document.getElementById("importPackageBtn"),
+      packageInput: document.getElementById("packageInput"),
+      mainViewLabel: document.getElementById("mainViewLabel"),
+      metaPanel: document.getElementById("metaPanel"),
+      metaGrid: document.getElementById("metaGrid"),
+      showSlideBtn: document.getElementById("showSlideBtn"),
+      toggleInfoBtn: document.getElementById("toggleInfoBtn"),
+      infoSizeRange: document.getElementById("infoSizeRange"),
+      normPanel: document.getElementById("normPanel"),
+      normBody: document.getElementById("normBody"),
+      toggleNormPanelBtn: document.getElementById("toggleNormPanelBtn"),
+      normSizeRange: document.getElementById("normSizeRange"),
+      normSource: document.getElementById("normSourceSelect"),
+      normTarget: document.getElementById("normTargetSelect"),
+      normTau: document.getElementById("normTau"),
+      normLam: document.getElementById("normLam"),
+      normRows: document.getElementById("normRows"),
+      normCols: document.getElementById("normCols"),
+      normMaxSide: document.getElementById("normMaxSide"),
+      normPreferLow: document.getElementById("normPreferLow"),
+      runNorm: document.getElementById("runNormBtn"),
+      normStatus: document.getElementById("normStatus"),
+      normSourcePreview: document.getElementById("normSourcePreview"),
+      normTargetPreview: document.getElementById("normTargetPreview"),
+      normTiledPreview: document.getElementById("normTiledPreview"),
+      normMonoPreview: document.getElementById("normMonoPreview"),
+      normDiffPreview: document.getElementById("normDiffPreview")
+    };
+
+    function setStatus(msg) {
+      el.status.textContent = msg;
+    }
+
+    function setNormStatus(msg) {
+      el.normStatus.textContent = msg;
+    }
+
+    function setMainViewLabel(msg) {
+      el.mainViewLabel.textContent = msg;
+    }
+
+    function withTimestamp(url) {
+      return `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
+    }
+
+    function humanSize(size) {
+      if (!Number.isFinite(size)) return "-";
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      let n = size;
+      let idx = 0;
+      while (n >= 1024 && idx < units.length - 1) {
+        n /= 1024;
+        idx += 1;
+      }
+      return `${n.toFixed(2)} ${units[idx]}`;
+    }
+
+    function renderMeta(meta) {
+      document.getElementById("mName").textContent = meta?.name || "-";
+      document.getElementById("mSize").textContent = meta ? humanSize(meta.fileSize) : "-";
+      document.getElementById("mDim").textContent = meta ? `${meta.width} x ${meta.height}` : "-";
+      document.getElementById("mLevels").textContent = meta?.levelCount ?? "-";
+      document.getElementById("mVendor").textContent = meta?.vendor || "-";
+      document.getElementById("mObj").textContent = meta?.objectivePower || "-";
+      document.getElementById("mMppX").textContent = meta?.mppX ?? "-";
+      document.getElementById("mMppY").textContent = meta?.mppY ?? "-";
+    }
+
+    function ensureViewer() {
+      if (!state.viewer) {
+        state.viewer = OpenSeadragon({
+          id: "viewer",
+          prefixUrl: "https://cdn.jsdelivr.net/npm/openseadragon@5.0.1/build/openseadragon/images/",
+          showNavigator: true,
+          navigatorPosition: "BOTTOM_RIGHT",
+          visibilityRatio: 1,
+          maxZoomPixelRatio: 4,
+          imageLoaderLimit: 4
+        });
+      }
+      return state.viewer;
+    }
+
+    function updatePanelStates() {
+      el.metaPanel.classList.toggle("collapsed", state.infoCollapsed);
+      el.normPanel.classList.toggle("collapsed", state.normCollapsed);
+
+      el.toggleInfoBtn.textContent = state.infoCollapsed ? "Expand Info" : "Collapse Info";
+      el.toggleNormPanelBtn.textContent = state.normCollapsed ? "Expand GDDN" : "Collapse GDDN";
+
+      el.infoSizeRange.disabled = state.infoCollapsed;
+      el.normSizeRange.disabled = state.normCollapsed;
+      el.metaPanel.style.height = state.infoCollapsed ? "38px" : `${state.infoPanelHeight}px`;
+      el.normPanel.style.height = state.normCollapsed ? "40px" : `${state.normPanelHeight}px`;
+    }
+
+    function updateNormCardSelection() {
+      document.querySelectorAll(".norm-card.switchable").forEach(card => {
+        const key = card.getAttribute("data-artifact-key");
+        card.classList.toggle("active", !!state.currentArtifactKey && key === state.currentArtifactKey);
+      });
+    }
+
+    function openArtifactInMainViewer(artifactKey) {
+      const baseUrl = state.normArtifacts?.[artifactKey];
+      if (!baseUrl) {
+        setNormStatus(`No artifact available for ${artifactTitleMap[artifactKey] || artifactKey}.`);
+        return;
+      }
+      const viewer = ensureViewer();
+      const title = artifactTitleMap[artifactKey] || artifactKey;
+      viewer.open({ type: "image", url: withTimestamp(baseUrl) });
+      state.currentArtifactKey = artifactKey;
+      updateNormCardSelection();
+      setMainViewLabel(`Main View: ${title}`);
+      el.showSlideBtn.disabled = !state.lastOpenedSlide;
+      setStatus(`Opened ${title} in main viewer.`);
+    }
+
+    async function loadSlides() {
+      const params = new URLSearchParams({
+        q: state.q,
+        offset: String(state.offset),
+        limit: String(state.pageSize)
+      });
+      setStatus("Loading slides...");
+      const resp = await fetch(`/api/slides?${params.toString()}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      state.slides = data.items || [];
+      state.total = data.total || 0;
+
+      if (state.currentId && !state.slides.some(x => x.id === state.currentId)) {
+        state.currentId = null;
+      }
+      if (state.lastOpenedSlide && !state.slides.some(x => x.id === state.lastOpenedSlide.id)) {
+        state.lastOpenedSlide = null;
+        el.showSlideBtn.disabled = true;
+      }
+
+      renderSlideList();
+      renderNormalizationSelectors();
+      renderPager();
+      setStatus(`Loaded ${state.slides.length} / ${state.total}`);
+    }
+
+    function renderPager() {
+      const maxPage = Math.max(1, Math.ceil(state.total / state.pageSize));
+      const page = Math.floor(state.offset / state.pageSize) + 1;
+      el.pageInfo.textContent = `${page} / ${maxPage}`;
+      el.prev.disabled = page <= 1;
+      el.next.disabled = page >= maxPage;
+    }
+
+    function renderSlideList() {
+      el.list.innerHTML = "";
+      if (!state.slides.length) {
+        const item = document.createElement("div");
+        item.className = "muted";
+        item.textContent = "No slides found.";
+        el.list.appendChild(item);
+        return;
+      }
+
+      for (const slide of state.slides) {
+        const node = document.createElement("div");
+        node.className = "slide-item" + (slide.id === state.currentId ? " active" : "");
+        node.innerHTML = `
+          <div class="thumb-wrap">
+            <img src="/api/thumb/${slide.id}" loading="lazy" alt="thumb" />
+          </div>
+          <div>
+            <div class="slide-name" title="${slide.name}">${slide.name}</div>
+            <div class="slide-path" title="${slide.relativePath}">${slide.relativePath}</div>
+            <div class="slide-meta">${slide.sourceType || "native"} | ${humanSize(slide.size)}</div>
+          </div>
+        `;
+        node.addEventListener("click", () => openSlide(slide));
+        el.list.appendChild(node);
+      }
+    }
+
+    function renderNormalizationSelectors() {
+      const nativeSlides = state.slides.filter(s => (s.sourceType || "native") === "native");
+      const prevSource = el.normSource.value;
+      const prevTarget = el.normTarget.value;
+
+      el.normSource.innerHTML = "";
+      el.normTarget.innerHTML = "";
+
+      if (!nativeSlides.length) {
+        el.runNorm.disabled = true;
+        setNormStatus("No native slides available for GDDN(A,B).");
+        return;
+      }
+
+      for (const slide of nativeSlides) {
+        const sourceOption = document.createElement("option");
+        sourceOption.value = slide.id;
+        sourceOption.textContent = `${slide.name} (${slide.id})`;
+        el.normSource.appendChild(sourceOption);
+
+        const targetOption = document.createElement("option");
+        targetOption.value = slide.id;
+        targetOption.textContent = `${slide.name} (${slide.id})`;
+        el.normTarget.appendChild(targetOption);
+      }
+
+      const hasSource = nativeSlides.some(s => s.id === prevSource);
+      const hasTarget = nativeSlides.some(s => s.id === prevTarget);
+      const defaultSource = hasSource
+        ? prevSource
+        : ((state.currentId && nativeSlides.some(s => s.id === state.currentId)) ? state.currentId : nativeSlides[0].id);
+      const fallbackTarget = nativeSlides.find(s => s.id !== defaultSource)?.id || defaultSource;
+      const defaultTarget = hasTarget ? prevTarget : fallbackTarget;
+
+      el.normSource.value = defaultSource;
+      el.normTarget.value = defaultTarget;
+
+      el.runNorm.disabled = state.normRunning;
+      if (
+        !state.normRunning &&
+        (!el.normStatus.textContent ||
+          el.normStatus.textContent.startsWith("Color normalization ready.") ||
+          el.normStatus.textContent.startsWith("No native slides") ||
+          el.normStatus.textContent.startsWith("Ready: A="))
+      ) {
+        setNormStatus(`Ready: A=${el.normSource.selectedOptions[0].textContent} | B=${el.normTarget.selectedOptions[0].textContent}`);
+      }
+    }
+
+    function renderNormalizationResult(result) {
+      state.normArtifacts = result?.artifacts || {};
+      const mapping = [
+        [el.normSourcePreview, "sourcePreview"],
+        [el.normTargetPreview, "targetPreview"],
+        [el.normTiledPreview, "normalizedTiled"],
+        [el.normMonoPreview, "normalizedMono"],
+        [el.normDiffPreview, "differenceHeatmap"]
+      ];
+      for (const [imgEl, key] of mapping) {
+        const url = state.normArtifacts[key];
+        imgEl.src = url ? withTimestamp(url) : "";
+      }
+      state.currentArtifactKey = "";
+      updateNormCardSelection();
+    }
+
+    async function readApiError(resp) {
+      try {
+        const data = await resp.json();
+        if (data && typeof data === "object") {
+          return data.detail || JSON.stringify(data);
+        }
+      } catch (_) {
+      }
+      try {
+        const text = await resp.text();
+        if (text) return text;
+      } catch (_) {
+      }
+      return `HTTP ${resp.status}`;
+    }
+
+    async function runNormalization() {
+      const sourceSlideId = el.normSource.value;
+      const targetSlideId = el.normTarget.value;
+      if (!sourceSlideId || !targetSlideId) {
+        setNormStatus("Select both Source A and Target B.");
+        return;
+      }
+
+      const payload = {
+        sourceSlideId,
+        targetSlideId,
+        tau: Number(el.normTau.value || 0.2),
+        lam: Number(el.normLam.value || 5.0),
+        tileRows: Number(el.normRows.value || 4),
+        tileCols: Number(el.normCols.value || 4),
+        maxSide: Number(el.normMaxSide.value || 2048),
+        preferLowMagnification: Boolean(el.normPreferLow.checked)
+      };
+
+      state.normRunning = true;
+      el.runNorm.disabled = true;
+      setNormStatus(`Running GDDN(A=${sourceSlideId}, B=${targetSlideId})...`);
+      setStatus("Running color normalization...");
+
+      try {
+        const resp = await fetch("/api/color-normalization/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+          throw new Error(await readApiError(resp));
+        }
+        const result = await resp.json();
+        renderNormalizationResult(result);
+        setNormStatus(`Done: ${result.resultId} (${result.elapsedMs} ms)`);
+        setStatus("Color normalization completed.");
+        openArtifactInMainViewer("normalizedTiled");
+      } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        setNormStatus(`GDDN failed: ${msg}`);
+        setStatus(`GDDN failed: ${msg}`);
+      } finally {
+        state.normRunning = false;
+        el.runNorm.disabled = false;
+      }
+    }
+
+    async function openSlide(slide) {
+      state.currentId = slide.id;
+      state.lastOpenedSlide = slide;
+      state.currentArtifactKey = "";
+      updateNormCardSelection();
+      renderSlideList();
+      setStatus(`Opening ${slide.name}...`);
+
+      const viewer = ensureViewer();
+      viewer.open(`/dzi/${slide.id}.dzi`);
+      setMainViewLabel(`Main View: Slide - ${slide.name}`);
+      el.showSlideBtn.disabled = true;
+
+      try {
+        const metaResp = await fetch(`/api/meta/${slide.id}`);
+        if (metaResp.ok) {
+          const meta = await metaResp.json();
+          renderMeta(meta);
+        } else {
+          renderMeta(null);
+        }
+      } catch (_) {
+        renderMeta(null);
+      }
+
+      setStatus(`Opened ${slide.name}`);
+
+      if ((slide.sourceType || "native") === "native") {
+        const optionExists = Array.from(el.normSource.options).some(x => x.value === slide.id);
+        if (optionExists) {
+          el.normSource.value = slide.id;
+        }
+      }
+    }
+
+    async function reindex() {
+      setStatus("Reindexing...");
+      const resp = await fetch("/api/reindex", { method: "POST" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      await loadSlides();
+    }
+
+    async function importPackage(file) {
+      if (!file) return;
+      setStatus(`Importing package: ${file.name} ...`);
+      const resp = await fetch("/api/packages/import", {
+        method: "POST",
+        headers: {
+          "X-Package-Name": file.name,
+          "Content-Type": "application/octet-stream"
+        },
+        body: file
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(text || `HTTP ${resp.status}`);
+      }
+      await loadSlides();
+      setStatus(`Package imported: ${file.name}`);
+    }
+
+    let searchTimer = null;
+    el.search.addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        state.q = el.search.value.trim();
+        state.offset = 0;
+        loadSlides().catch(err => setStatus(`Load failed: ${err.message}`));
+      }, 250);
+    });
+
+    el.prev.addEventListener("click", () => {
+      state.offset = Math.max(0, state.offset - state.pageSize);
+      loadSlides().catch(err => setStatus(`Load failed: ${err.message}`));
+    });
+
+    el.next.addEventListener("click", () => {
+      state.offset += state.pageSize;
+      loadSlides().catch(err => setStatus(`Load failed: ${err.message}`));
+    });
+
+    el.refresh.addEventListener("click", () => {
+      reindex().catch(err => setStatus(`Reindex failed: ${err.message}`));
+    });
+
+    el.importPackage.addEventListener("click", () => {
+      el.packageInput.value = "";
+      el.packageInput.click();
+    });
+
+    el.packageInput.addEventListener("change", () => {
+      const file = el.packageInput.files && el.packageInput.files[0];
+      importPackage(file).catch(err => setStatus(`Import failed: ${err.message}`));
+    });
+
+    el.runNorm.addEventListener("click", () => {
+      runNormalization();
+    });
+
+    el.showSlideBtn.addEventListener("click", () => {
+      if (state.lastOpenedSlide) {
+        openSlide(state.lastOpenedSlide);
+      }
+    });
+
+    el.toggleInfoBtn.addEventListener("click", () => {
+      state.infoCollapsed = !state.infoCollapsed;
+      updatePanelStates();
+    });
+
+    el.infoSizeRange.addEventListener("input", () => {
+      state.infoPanelHeight = Number(el.infoSizeRange.value || 110);
+      updatePanelStates();
+    });
+
+    el.toggleNormPanelBtn.addEventListener("click", () => {
+      state.normCollapsed = !state.normCollapsed;
+      updatePanelStates();
+    });
+
+    el.normSizeRange.addEventListener("input", () => {
+      state.normPanelHeight = Number(el.normSizeRange.value || 320);
+      updatePanelStates();
+    });
+
+    document.querySelectorAll(".norm-card.switchable").forEach(card => {
+      card.addEventListener("click", () => {
+        const artifactKey = card.getAttribute("data-artifact-key");
+        openArtifactInMainViewer(artifactKey);
+      });
+    });
+
+    state.infoPanelHeight = Number(el.infoSizeRange.value || 110);
+    state.normPanelHeight = Number(el.normSizeRange.value || 320);
+    updatePanelStates();
+    setMainViewLabel("Main View: Slide");
+    el.showSlideBtn.disabled = true;
+
+    loadSlides().catch(err => setStatus(`Load failed: ${err.message}`));
+  </script>
+</body>
+</html>

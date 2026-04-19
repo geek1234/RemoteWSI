@@ -1,0 +1,12 @@
+__pycache__
+*.egg-info
+slides/
+config.yml
+docker-compose-local.yml
+.env
+build/
+dist/
+*.spec
+*.pyc
+scripts/artifacts/
+tmp-*.log
