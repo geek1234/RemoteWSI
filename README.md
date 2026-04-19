@@ -8,7 +8,7 @@ RemoteWSI is an open-source pathology WSI system for:
 
 This repository contains the thesis-oriented `v1.0.0` engineering baseline.
 
-![Viewer](assets/fullscreenviewer.png)
+![RemoteWSI GDDN Interaction](docs/figures/figA3_gddn_interaction.png)
 
 ## 中文简介
 
@@ -38,6 +38,11 @@ RemoteWSI provides an end-to-end workflow for digital pathology collaboration:
 - Automated smoke tests for API/UI/color-normalization paths
 - Windows distributable bundle build script (PyInstaller)
 - Open-source baseline docs (`CONTRIBUTING`, `SECURITY`, CI workflow)
+
+## Disclosure Notice / 公开说明
+
+- More advanced compression/encoding methods and extended transmission modes will be released after related papers and patents are officially disclosed.
+- 更丰富的压缩编码方法与传输模式将在后续相关论文和专利正式公开后发布。
 
 ## Quick Start (Windows Local Mode)
 
